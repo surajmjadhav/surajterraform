@@ -1,0 +1,28 @@
+deployment:
+  replicas: 1
+
+providers:
+  kubernetesGateway:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+
+gateway:
+  enabled: false
+
+gatewayClass:
+  enabled: false
+
+service:
+  type: LoadBalancer
+
+api:
+  dashboard: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
