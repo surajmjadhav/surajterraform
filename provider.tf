@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurearm = {
       source  = "hashicorp/azurearm"
-      version = "~> 4.0"
+      version = "1.14.6"
     }
   }
 }
