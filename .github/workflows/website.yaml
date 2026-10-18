@@ -1,0 +1,165 @@
+name: Deploy AKS Website
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "kubernetes/**"
+      - ".github/workflows/website.yaml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aks-website
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Nginx with HTTPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@8c334a195cbb38e46038007b304988d888bf676a
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.36.4"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.17.3"
+
+      - name: Connect to AKS
+        run: |
+          az aks get-credentials \
+            --resource-group re-terraform-lab \
+            --name aks-suraj-lab \
+            --overwrite-existing
+
+          kubectl get nodes
+
+      - name: Install Gateway API
+        run: |
+          kubectl apply --server-side -f \
+            https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+
+          kubectl wait --for=condition=Established \
+            crd/gatewayclasses.gateway.networking.k8s.io \
+            crd/gateways.gateway.networking.k8s.io \
+            crd/httproutes.gateway.networking.k8s.io \
+            --timeout=120s
+
+      - name: Install Traefik
+        run: |
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+
+          helm upgrade --install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            --values kubernetes/traefik-values.yaml \
+            --wait \
+            --timeout 5m
+
+      - name: Install cert-manager
+        run: |
+          helm upgrade --install cert-manager \
+            oci://quay.io/jetstack/charts/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --set crds.enabled=true \
+            --wait \
+            --timeout 5m
+
+      - name: Deploy website
+        run: |
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl apply -f kubernetes/deployment.yaml
+          kubectl apply -f kubernetes/service.yaml
+
+          kubectl rollout status deployment/hello \
+            --namespace hello-lab \
+            --timeout=180s
+
+      - name: Get public IP and configure HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PUBLIC_IP=""
+
+          for attempt in {1..60}; do
+            PUBLIC_IP=$(kubectl get service traefik \
+              --namespace traefik \
+              -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+            if [ -n "$PUBLIC_IP" ]; then
+              break
+            fi
+
+            echo "Waiting for public IP: attempt ${attempt}/60"
+            sleep 10
+          done
+
+          if [ -z "$PUBLIC_IP" ]; then
+            echo "Public IP was not assigned."
+            exit 1
+          fi
+
+          export LAB_HOST="suraj-${PUBLIC_IP//./-}.sslip.io"
+
+          echo "Public IP: ${PUBLIC_IP}"
+          echo "Website: https://${LAB_HOST}"
+          echo "Website: https://${LAB_HOST}" >> "$GITHUB_STEP_SUMMARY"
+
+          kubectl apply -f kubernetes/issuer.yaml
+          kubectl apply -f kubernetes/gatewayclass.yaml
+
+          for file in certificate gateway httproute redirect; do
+            envsubst '${LAB_HOST}' < "kubernetes/${file}.yaml" \
+              | kubectl apply -f -
+          done
+
+          kubectl wait --for=condition=Ready \
+            certificate/hello-tls \
+            --namespace hello-lab \
+            --timeout=600s
+
+          kubectl wait --for=condition=Programmed \
+            gateway/hello-gateway \
+            --namespace hello-lab \
+            --timeout=180s
+
+          curl --fail --show-error \
+            --retry 12 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            "https://${LAB_HOST}"
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods,svc -n traefik || true
+          kubectl get pods -n cert-manager || true
+          kubectl get pods,svc,certificate,gateway,httproute \
+            -n hello-lab || true
+          kubectl describe certificate hello-tls \
+            -n hello-lab || true
+          kubectl get challenges,orders -n hello-lab || true
+          kubectl describe gateway hello-gateway \
+            -n hello-lab || true

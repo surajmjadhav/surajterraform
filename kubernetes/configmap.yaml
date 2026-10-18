@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-page
+  namespace: hello-lab
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Suraj's AKS Lab</title>
+      <style>
+        *{box-sizing:border-box}
+        body{margin:0;min-height:100vh;display:grid;place-items:center;
+        background:linear-gradient(135deg,#071329,#242066,#007e91);
+        color:white;font-family:Arial,sans-serif;padding:24px}
+        main{max-width:650px;padding:48px 30px;border-radius:28px;
+        background:#ffffff12;border:1px solid #ffffff40;
+        box-shadow:0 24px 80px #0005;text-align:center}
+        .badge{display:inline-block;background:#34d399;color:#052e25;
+        padding:9px 18px;border-radius:30px;font-weight:bold}
+        h1{font-size:clamp(40px,9vw,76px);margin:24px 0;
+        background:linear-gradient(90deg,#67e8f9,#c4b5fd,#fda4af);
+        background-clip:text;color:transparent}
+        p{font-size:19px;line-height:1.7;color:#e0e7ff}
+        footer{margin-top:30px;color:#a5f3fc}
+      </style>
+    </head>
+    <body>
+      <main>
+        <span class="badge">LIVE ON AZURE KUBERNETES</span>
+        <h1>Hello, World!</h1>
+        <p>Built by Suraj Jadhav 🚀<br>
+        From Terraform to Kubernetes — my cloud lab is live!</p>
+        <p>3 Nginx replicas · Gateway API · HTTPS</p>
+        <footer>Open it. Share it. Keep learning.</footer>
+      </main>
+    </body>
+    </html>
