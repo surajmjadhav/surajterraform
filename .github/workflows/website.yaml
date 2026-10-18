@@ -55,7 +55,7 @@ jobs:
       - name: Install Gateway API
         run: |
           kubectl apply --server-side -f \
-            https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+            https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 
           kubectl wait --for=condition=Established \
             crd/gatewayclasses.gateway.networking.k8s.io \
