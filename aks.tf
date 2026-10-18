@@ -9,7 +9,7 @@ resource "azurerm_kubernetes_cluster" "lab" {
     name            = "system"
     node_count      = 2
     vm_size         = "Standard_D4s_v3"
-    zones           = ["3"]
+    zones           = ["1"]
     os_disk_type    = "Managed"
     os_disk_size_gb = 32
   }
