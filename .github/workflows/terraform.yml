@@ -80,8 +80,8 @@ jobs:
       - name: Terraform Validate
         run: terraform validate -no-color
 
-      - name: Terraform Plan
-        run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+      - name: Terraform Destroy Plan
+        run: terraform plan -destroy -input=false -lock-timeout=5m -out=tfplan
 
-      - name: Terraform Apply
+      - name: Terraform Destroy Apply
         run: terraform apply -input=false -lock-timeout=5m tfplan
